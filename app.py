@@ -117,7 +117,7 @@ def recognize():
                                 
                     if best_match:
                         name = best_match
-                        confidence = best_confidence
+                        confidence = float(best_confidence)
                 except Exception as e:
                     print(f"Recognition error: {e}")
 
