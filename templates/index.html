@@ -3,33 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Face Recognition</title>
+    <title>Biometric Identification Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #1e1e1e; color: white; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; }
-        .video-container { position: relative; display: inline-block; margin-top: 20px; }
-        video { border-radius: 10px; border: 2px solid #444; width: 100%; max-width: 640px; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 10px; }
-        .controls { margin-top: 20px; }
-        input { padding: 10px; font-size: 16px; border-radius: 5px; border: none; }
-        button { padding: 10px 20px; font-size: 16px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
-        button:hover { background: #45a049; }
-        #status { margin-top: 15px; font-weight: bold; color: #ffeb3b; }
+        :root {
+            --bg-base: #090d16;
+            --bg-surface: #111827;
+            --bg-surface-hover: #1f293d;
+            --border-color: #1e293b;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #38bdf8;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-green-bg: rgba(34, 197, 94, 0.12);
+            --accent-red-bg: rgba(239, 68, 68, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navbar */
+        header {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.15rem;
+            letter-spacing: -0.01em;
+        }
+
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--accent-blue);
+        }
+
+        .system-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-sub);
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+        }
+
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        /* Main Workspace */
+        main {
+            max-width: 1320px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            gap: 2rem;
+            flex: 1;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-sub);
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Video Feed Panel */
+        .viewport-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background-color: #030712;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Sidebar Controls */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-blue);
+            color: #000000;
+            border: none;
+            padding: 0.85rem 1.25rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        /* Status Toast */
+        .status-box {
+            font-size: 0.875rem;
+            padding: 0.85rem 1rem;
+            border-radius: 6px;
+            background: var(--bg-base);
+            border: 1px solid var(--border-color);
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-box.success {
+            background: var(--accent-green-bg);
+            border-color: rgba(34, 197, 94, 0.3);
+            color: var(--accent-green);
+        }
+
+        .status-box.error {
+            background: var(--accent-red-bg);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--accent-red);
+        }
+
+        /* Telemetry Feed */
+        .log-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 0.85rem;
+            background-color: var(--bg-base);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .identity-badge {
+            font-weight: 600;
+        }
+
+        .identity-badge.known {
+            color: var(--accent-green);
+        }
+
+        .identity-badge.unknown {
+            color: var(--accent-red);
+        }
+
+        .confidence-val {
+            color: var(--text-muted);
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📸 Face Recognition System</h1>
-        <div class="video-container">
-            <video id="video" autoplay playsinline></video>
-            <canvas id="overlay"></canvas>
+    <header>
+        <div class="logo-group">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 3H5a2 2 0 0 0-2 2v4m16-6h-4a2 2 0 0 1 2 2v4M3 15v4a2 2 0 0 0 2 2h4m12-6v4a2 2 0 0 1-2 2h-4"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span>Biometric Vision Matrix</span>
         </div>
-        <div class="controls">
-            <input type="text" id="nameInput" placeholder="Enter Name">
-            <button onclick="registerFace()">Register Face</button>
+        <div class="system-status">
+            <div class="system-badge">
+                <div class="badge-dot"></div>
+                <span id="system-state-text">Model Engine Online</span>
+            </div>
         </div>
-        <div id="status">Loading webcam...</div>
-    </div>
+    </header>
+
+    <main>
+        <!-- Left Section: Camera Feed -->
+        <section class="card">
+            <div class="card-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                </svg>
+                Live Optical Feed
+            </div>
+            <div class="viewport-wrapper">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="overlay"></canvas>
+            </div>
+        </section>
+
+        <!-- Right Section: Controls & Telemetry -->
+        <aside class="sidebar">
+            <div class="card">
+                <div class="card-header">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <polyline points="17 11 19 13 23 9"></polyline>
+                    </svg>
+                    Enroll Subject
+                </div>
+                <div class="form-group">
+                    <label for="nameInput">Full Name / Subject ID</label>
+                    <input type="text" id="nameInput" placeholder="e.g. Alex Mercer" autocomplete="off">
+                </div>
+                <button class="btn-primary" onclick="registerFace()">
+                    Enroll Identity Profile
+                </button>
+                <div id="status" class="status-box" style="margin-top: 1rem;">
+                    Initializing camera device...
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    Detection Telemetry
+                </div>
+                <div class="log-list" id="detectionLog">
+                    <div class="log-item">
+                        <span class="identity-badge unknown">No Detections</span>
+                        <span class="confidence-val">--</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
 
     <script>
         const video = document.getElementById('video');
@@ -37,27 +348,32 @@
         const ctx = canvas.getContext('2d');
         const statusDiv = document.getElementById('status');
         const nameInput = document.getElementById('nameInput');
-        
+        const detectionLog = document.getElementById('detectionLog');
+
         let isRecognizing = false;
 
-        // Start Webcam
+        // Initialize Webcam Stream
         async function setupCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
-                statusDiv.innerText = "Ready. Look at the camera.";
+                
                 video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
-                    // Start sending frames to the server every 500ms
-                    setInterval(processFrame, 500);
+                    setStatus("Optical sensor linked. Ready for scan.", "neutral");
+                    setInterval(processFrame, 400);
                 };
             } catch (err) {
-                statusDiv.innerText = "Webcam access denied!";
+                setStatus("Camera permissions denied or device missing.", "error");
             }
         }
 
-        // Capture image from video
+        function setStatus(text, type) {
+            statusDiv.innerText = text;
+            statusDiv.className = `status-box ${type}`;
+        }
+
         function captureImage() {
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = video.videoWidth;
@@ -66,64 +382,118 @@
             return tempCanvas.toDataURL('image/jpeg', 0.8);
         }
 
-        // Send frame to backend for recognition
         async function processFrame() {
             if (isRecognizing || video.paused || video.ended) return;
             isRecognizing = true;
 
             const imageData = captureImage();
-            
+
             try {
                 const response = await fetch('/recognize', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: imageData })
                 });
-                
+
                 const data = await response.json();
-                drawResults(data.faces);
+                if (data.faces) {
+                    drawResults(data.faces);
+                    updateTelemetryLog(data.faces);
+                }
             } catch (err) {
-                console.error("Error:", err);
+                console.error("Transmission error:", err);
             } finally {
                 isRecognizing = false;
             }
         }
 
-        // Draw boxes on the canvas
         function drawResults(faces) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
+
             faces.forEach(face => {
                 const [x, y, w, h] = face.box;
                 const isKnown = face.name !== "Unknown";
+                const strokeColor = isKnown ? '#22c55e' : '#ef4444';
+
+                // High-Tech Corner Bounding Reticle
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 2;
                 
-                // Draw Box
-                ctx.strokeStyle = isKnown ? '#00FF00' : '#FF0000';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(x, y, w, h);
+                const cornerLen = Math.min(w, h) * 0.2;
                 
-                // Draw Label Background
-                ctx.fillStyle = isKnown ? '#00FF00' : '#FF0000';
-                const label = isKnown ? `${face.name} (${face.confidence.toFixed(2)})` : "Unknown";
-                ctx.font = "20px Arial";
+                // Top-Left
+                ctx.beginPath();
+                ctx.moveTo(x, y + cornerLen);
+                ctx.lineTo(x, y);
+                ctx.lineTo(x + cornerLen, y);
+                ctx.stroke();
+
+                // Top-Right
+                ctx.beginPath();
+                ctx.moveTo(x + w - cornerLen, y);
+                ctx.lineTo(x + w, y);
+                ctx.lineTo(x + w, y + cornerLen);
+                ctx.stroke();
+
+                // Bottom-Left
+                ctx.beginPath();
+                ctx.moveTo(x, y + h - cornerLen);
+                ctx.lineTo(x, y + h);
+                ctx.lineTo(x + cornerLen, y + h);
+                ctx.stroke();
+
+                // Bottom-Right
+                ctx.beginPath();
+                ctx.moveTo(x + w - cornerLen, y + h);
+                ctx.lineTo(x + w, y + h);
+                ctx.lineTo(x + w, y + h - cornerLen);
+                ctx.stroke();
+
+                // Fill label background tag
+                ctx.fillStyle = strokeColor;
+                const label = isKnown ? `${face.name} [${(face.confidence * 100).toFixed(0)}%]` : "UNIDENTIFIED";
+                ctx.font = "600 13px Inter, sans-serif";
                 const textWidth = ctx.measureText(label).width;
-                ctx.fillRect(x, y - 30, textWidth + 10, 30);
-                
-                // Draw Text
+
+                ctx.fillRect(x, y - 26, textWidth + 14, 26);
+
+                // Label Text
                 ctx.fillStyle = '#000000';
-                ctx.fillText(label, x + 5, y - 8);
+                ctx.fillText(label, x + 7, y - 8);
             });
         }
 
-        // Register Face
-        async function registerFace() {
-            const name = nameInput.value.trim();
-            if (!name) {
-                alert("Please enter a name first!");
+        function updateTelemetryLog(faces) {
+            if (faces.length === 0) {
+                detectionLog.innerHTML = `
+                    <div class="log-item">
+                        <span class="identity-badge unknown">Scanning area...</span>
+                        <span class="confidence-val">--</span>
+                    </div>`;
                 return;
             }
 
-            statusDiv.innerText = "Registering...";
+            detectionLog.innerHTML = faces.map(face => {
+                const isKnown = face.name !== "Unknown";
+                const confText = isKnown ? `${(face.confidence * 100).toFixed(1)}%` : '--';
+                return `
+                    <div class="log-item">
+                        <span class="identity-badge ${isKnown ? 'known' : 'unknown'}">
+                            ${face.name}
+                        </span>
+                        <span class="confidence-val">${confText}</span>
+                    </div>`;
+            }).join('');
+        }
+
+        async function registerFace() {
+            const name = nameInput.value.trim();
+            if (!name) {
+                setStatus("Name input required before scanning.", "error");
+                return;
+            }
+
+            setStatus("Capturing biometric vector...", "neutral");
             const imageData = captureImage();
 
             try {
@@ -132,21 +502,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: name, image: imageData })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
-                    statusDiv.innerText = `✅ ${data.message}`;
+                    setStatus(data.message, "success");
                     nameInput.value = "";
                 } else {
-                    statusDiv.innerText = `❌ Error: ${data.error}`;
+                    setStatus(`Enrollment failure: ${data.error}`, "error");
                 }
             } catch (err) {
-                statusDiv.innerText = "❌ Failed to connect to server.";
+                setStatus("Network failure while sending payload.", "error");
             }
         }
 
-        // Initialize
         setupCamera();
     </script>
 </body>
