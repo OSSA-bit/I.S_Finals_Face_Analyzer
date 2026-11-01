@@ -40,7 +40,7 @@ def load_known_faces():
                     data[name]["encoding"] = encoding
                 known_faces = data
         except Exception as e:
-            print(f"Error loading faces: {e}")
+            print(f"[SYSTEM ERROR] Failed to load known faces database: {e}")
 
 def save_known_faces():
     try:
@@ -56,12 +56,11 @@ def save_known_faces():
         with open(KNOWN_FACES_FILE, 'w') as f:
             json.dump(data, f, indent=2)
     except Exception as e:
-        print(f"Error saving faces: {e}")
+        print(f"[SYSTEM ERROR] Failed to save faces database: {e}")
 
 load_known_faces()
 
 def base64_to_image(base64_string):
-    # Remove the data URL prefix
     img_data = base64_string.split(',')[1]
     nparr = np.frombuffer(base64.b64decode(img_data), np.uint8)
     return cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -74,7 +73,7 @@ def index():
 def recognize():
     data = request.json
     if not data or 'image' not in data:
-        return jsonify({"error": "No image provided"}), 400
+        return jsonify({"error": "No image payload received"}), 400
 
     frame = base64_to_image(data['image'])
     height, width = frame.shape[:2]
@@ -119,7 +118,7 @@ def recognize():
                         name = best_match
                         confidence = float(best_confidence)
                 except Exception as e:
-                    print(f"Recognition error: {e}")
+                    print(f"[MODEL ERROR] Face alignment/recognition failure: {e}")
 
             results.append({
                 "box": bbox,
@@ -137,7 +136,7 @@ def register():
     image_data = data.get('image')
     
     if not name or not image_data:
-        return jsonify({"error": "Name or image missing"}), 400
+        return jsonify({"error": "Identity name or frame data missing"}), 400
 
     frame = base64_to_image(image_data)
     height, width = frame.shape[:2]
@@ -145,9 +144,8 @@ def register():
     detections = face_detector.detect(frame)
 
     if detections[1] is None or len(detections[1]) == 0:
-        return jsonify({"error": "No face detected"}), 400
+        return jsonify({"error": "No subject face detected in target frame"}), 400
 
-    # Grab the largest face (closest to camera)
     largest_face = max(detections[1], key=lambda d: d[2] * d[3])
     
     try:
@@ -161,7 +159,7 @@ def register():
             "count": 1
         }
         save_known_faces()
-        return jsonify({"success": True, "message": f"Registered {name}"})
+        return jsonify({"success": True, "message": f"Successfully enrolled profile for {name}"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
