@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Face Recognition</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #1e1e1e; color: white; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; }
+        .video-container { position: relative; display: inline-block; margin-top: 20px; }
+        video { border-radius: 10px; border: 2px solid #444; width: 100%; max-width: 640px; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 10px; }
+        .controls { margin-top: 20px; }
+        input { padding: 10px; font-size: 16px; border-radius: 5px; border: none; }
+        button { padding: 10px 20px; font-size: 16px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        button:hover { background: #45a049; }
+        #status { margin-top: 15px; font-weight: bold; color: #ffeb3b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📸 Face Recognition System</h1>
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="overlay"></canvas>
+        </div>
+        <div class="controls">
+            <input type="text" id="nameInput" placeholder="Enter Name">
+            <button onclick="registerFace()">Register Face</button>
+        </div>
+        <div id="status">Loading webcam...</div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('overlay');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+        const nameInput = document.getElementById('nameInput');
+        
+        let isRecognizing = false;
+
+        // Start Webcam
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                statusDiv.innerText = "Ready. Look at the camera.";
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    // Start sending frames to the server every 500ms
+                    setInterval(processFrame, 500);
+                };
+            } catch (err) {
+                statusDiv.innerText = "Webcam access denied!";
+            }
+        }
+
+        // Capture image from video
+        function captureImage() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            tempCanvas.getContext('2d').drawImage(video, 0, 0);
+            return tempCanvas.toDataURL('image/jpeg', 0.8);
+        }
+
+        // Send frame to backend for recognition
+        async function processFrame() {
+            if (isRecognizing || video.paused || video.ended) return;
+            isRecognizing = true;
+
+            const imageData = captureImage();
+            
+            try {
+                const response = await fetch('/recognize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+                
+                const data = await response.json();
+                drawResults(data.faces);
+            } catch (err) {
+                console.error("Error:", err);
+            } finally {
+                isRecognizing = false;
+            }
+        }
+
+        // Draw boxes on the canvas
+        function drawResults(faces) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            faces.forEach(face => {
+                const [x, y, w, h] = face.box;
+                const isKnown = face.name !== "Unknown";
+                
+                // Draw Box
+                ctx.strokeStyle = isKnown ? '#00FF00' : '#FF0000';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, y, w, h);
+                
+                // Draw Label Background
+                ctx.fillStyle = isKnown ? '#00FF00' : '#FF0000';
+                const label = isKnown ? `${face.name} (${face.confidence.toFixed(2)})` : "Unknown";
+                ctx.font = "20px Arial";
+                const textWidth = ctx.measureText(label).width;
+                ctx.fillRect(x, y - 30, textWidth + 10, 30);
+                
+                // Draw Text
+                ctx.fillStyle = '#000000';
+                ctx.fillText(label, x + 5, y - 8);
+            });
+        }
+
+        // Register Face
+        async function registerFace() {
+            const name = nameInput.value.trim();
+            if (!name) {
+                alert("Please enter a name first!");
+                return;
+            }
+
+            statusDiv.innerText = "Registering...";
+            const imageData = captureImage();
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, image: imageData })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.innerText = `✅ ${data.message}`;
+                    nameInput.value = "";
+                } else {
+                    statusDiv.innerText = `❌ Error: ${data.error}`;
+                }
+            } catch (err) {
+                statusDiv.innerText = "❌ Failed to connect to server.";
+            }
+        }
+
+        // Initialize
+        setupCamera();
+    </script>
+</body>
+</html>
