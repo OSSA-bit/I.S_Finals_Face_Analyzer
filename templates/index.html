@@ -143,7 +143,7 @@
         .viewport-wrapper {
             position: relative;
             width: 100%;
-            aspect-ratio: 16 / 9; /* fallback until video metadata loads */
+            aspect-ratio: 16 / 9;
             background-color: #030712;
             border-radius: 8px;
             overflow: hidden;
@@ -168,6 +168,37 @@
             height: 100%;
             pointer-events: none;
             display: block;
+        }
+
+        /* Camera Permission Overlay */
+        .camera-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(9, 13, 22, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            z-index: 10;
+            text-align: center;
+            padding: 2rem;
+            transition: opacity 0.3s ease;
+        }
+        .camera-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .camera-overlay svg {
+            width: 48px;
+            height: 48px;
+            color: var(--text-muted);
+        }
+        .camera-overlay p {
+            color: var(--text-sub);
+            font-size: 0.95rem;
+            max-width: 300px;
+            line-height: 1.5;
         }
 
         /* Sidebar Controls */
@@ -197,7 +228,7 @@
             color: var(--text-main);
             padding: 0.75rem 1rem;
             border-radius: 6px;
-            font-size: 1rem; /* >= 16px prevents iOS zoom on focus */
+            font-size: 1rem;
             outline: none;
             transition: border-color 0.2s ease;
             width: 100%;
@@ -361,6 +392,18 @@
             <div class="viewport-wrapper" id="viewportWrapper">
                 <video id="video" autoplay playsinline muted></video>
                 <canvas id="overlay"></canvas>
+                
+                <!-- New Camera Permission Overlay -->
+                <div class="camera-overlay" id="cameraOverlay">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <p id="cameraOverlayText">Camera access is required for biometric scanning.</p>
+                    <button class="btn-primary" type="button" onclick="requestCamera()" id="cameraBtn" style="max-width: 200px;">
+                        Enable Camera
+                    </button>
+                </div>
             </div>
         </section>
 
@@ -382,7 +425,7 @@
                     Enroll Identity Profile
                 </button>
                 <div id="status" class="status-box" style="margin-top: 1rem;">
-                    Initializing camera device...
+                    Waiting for camera initialization...
                 </div>
             </div>
 
@@ -411,35 +454,102 @@
         const nameInput = document.getElementById('nameInput');
         const detectionLog = document.getElementById('detectionLog');
         const viewportWrapper = document.getElementById('viewportWrapper');
+        
+        // Permission Overlay Elements
+        const cameraOverlay = document.getElementById('cameraOverlay');
+        const cameraOverlayText = document.getElementById('cameraOverlayText');
+        const cameraBtn = document.getElementById('cameraBtn');
 
         let isRecognizing = false;
+        let streamActive = false;
 
-        async function setupCamera() {
+        // 1. Check Permissions First
+        async function checkCameraPermission() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                setStatus("Camera API unavailable. Serve over HTTPS or localhost.", "error");
+                setStatus("Camera API unavailable. Ensure you are using HTTPS.", "error");
+                cameraOverlayText.innerText = "Camera API unavailable on this connection. (Requires HTTPS)";
+                cameraBtn.style.display = 'none';
                 return;
             }
+
+            try {
+                const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+                
+                if (permissionStatus.state === 'granted') {
+                    startCamera();
+                } else if (permissionStatus.state === 'denied') {
+                    showDeniedState();
+                } else {
+                    // State is 'prompt' - wait for user to click the button
+                    setStatus("Camera permission required.", "neutral");
+                }
+
+                // Listen for changes in permissions dynamically
+                permissionStatus.onchange = () => {
+                    if (permissionStatus.state === 'granted') startCamera();
+                    if (permissionStatus.state === 'denied') showDeniedState();
+                };
+            } catch (e) {
+                // Some browsers (like Safari) don't fully support camera permissions query
+                // Fall back to just showing the button
+                console.log("Permissions API not fully supported, showing button.");
+                setStatus("Click 'Enable Camera' to begin.", "neutral");
+            }
+        }
+
+        // 2. Triggered by the user clicking the button
+        async function requestCamera() {
+            cameraBtn.innerText = "Requesting...";
+            cameraBtn.disabled = true;
+            await startCamera();
+        }
+
+        // 3. Start the camera stream
+        async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: { ideal: 'user' } },
                     audio: false
                 });
                 video.srcObject = stream;
+                streamActive = true;
 
                 video.onloadedmetadata = () => {
-                    // Match the wrapper's aspect ratio to the actual video stream
-                    // so the overlay canvas maps 1:1 to the visible feed on any device.
                     if (video.videoWidth && video.videoHeight) {
                         viewportWrapper.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
                     }
                     canvas.width = video.videoWidth || 640;
                     canvas.height = video.videoHeight || 480;
+                    
+                    // Hide overlay on success
+                    cameraOverlay.classList.add('hidden');
                     setStatus("Optical sensor linked. Ready for scan.", "neutral");
+                    
+                    // Start processing loop
                     setInterval(processFrame, 400);
                 };
             } catch (err) {
-                setStatus("Camera permissions denied or device missing.", "error");
+                console.error(err);
+                if (err.name === 'NotAllowedError') {
+                    showDeniedState();
+                } else if (err.name === 'NotFoundError') {
+                    setStatus("No camera device found on this system.", "error");
+                    cameraOverlayText.innerText = "No camera device found.";
+                    cameraBtn.style.display = 'none';
+                } else {
+                    setStatus("Failed to access camera.", "error");
+                    cameraBtn.innerText = "Retry Access";
+                    cameraBtn.disabled = false;
+                }
             }
+        }
+
+        function showDeniedState() {
+            setStatus("Camera access blocked. Please check browser settings.", "error");
+            cameraOverlayText.innerText = "Camera access is blocked. Please click the lock icon in your URL bar and allow camera access, then reload.";
+            cameraBtn.innerText = "Reload Page";
+            cameraBtn.disabled = false;
+            cameraBtn.onclick = () => window.location.reload(); 
         }
 
         function setStatus(text, type) {
@@ -456,7 +566,7 @@
         }
 
         async function processFrame() {
-            if (isRecognizing || video.paused || video.ended) return;
+            if (!streamActive || isRecognizing || video.paused || video.ended) return;
             isRecognizing = true;
             const imageData = captureImage();
 
@@ -481,8 +591,6 @@
         function drawResults(faces) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Ratio of internal pixels per CSS pixel — keeps strokes / fonts legible
-            // when the canvas is displayed smaller than its natural resolution (mobile).
             const rect = canvas.getBoundingClientRect();
             const ui = rect.width > 0 ? canvas.width / rect.width : 1;
 
@@ -524,7 +632,6 @@
                 ctx.lineTo(x + w, y + h - cornerLen);
                 ctx.stroke();
 
-                // Label background + text (scaled so it reads at ~13 CSS px on any screen)
                 const label = isKnown
                     ? `${face.name} [${(face.confidence * 100).toFixed(0)}%]`
                     : "UNIDENTIFIED";
@@ -569,6 +676,11 @@
         }
 
         async function registerFace() {
+            if (!streamActive) {
+                setStatus("Please enable the camera first.", "error");
+                return;
+            }
+            
             const name = nameInput.value.trim();
             if (!name) {
                 setStatus("Name input required before scanning.", "error");
@@ -596,7 +708,8 @@
             }
         }
 
-        setupCamera();
+        // Initialize the permission check on load
+        checkCameraPermission();
     </script>
 </body>
 </html>
