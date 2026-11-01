@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Biometric Identification Console</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,12 +30,17 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
+        html { -webkit-text-size-adjust: 100%; }
+
         body {
             background-color: var(--bg-base);
             color: var(--text-main);
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
 
         /* Top Navbar */
@@ -43,9 +48,12 @@
             background-color: var(--bg-surface);
             border-bottom: 1px solid var(--border-color);
             padding: 1rem 2rem;
+            padding-left: max(2rem, env(safe-area-inset-left));
+            padding-right: max(2rem, env(safe-area-inset-right));
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 1rem;
         }
 
         .logo-group {
@@ -55,13 +63,23 @@
             font-weight: 700;
             font-size: 1.15rem;
             letter-spacing: -0.01em;
+            min-width: 0;
+        }
+
+        .logo-group span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .logo-icon {
             width: 24px;
             height: 24px;
             color: var(--accent-blue);
+            flex-shrink: 0;
         }
+
+        .system-status { flex-shrink: 0; }
 
         .system-badge {
             display: flex;
@@ -73,6 +91,7 @@
             border: 1px solid rgba(56, 189, 248, 0.2);
             padding: 0.35rem 0.75rem;
             border-radius: 9999px;
+            white-space: nowrap;
         }
 
         .badge-dot {
@@ -81,6 +100,7 @@
             background-color: var(--accent-green);
             border-radius: 50%;
             box-shadow: 0 0 8px var(--accent-green);
+            flex-shrink: 0;
         }
 
         /* Main Workspace */
@@ -95,12 +115,6 @@
             flex: 1;
         }
 
-        @media (max-width: 1024px) {
-            main {
-                grid-template-columns: 1fr;
-            }
-        }
-
         .card {
             background-color: var(--bg-surface);
             border: 1px solid var(--border-color);
@@ -108,6 +122,7 @@
             padding: 1.5rem;
             display: flex;
             flex-direction: column;
+            min-width: 0;
         }
 
         .card-header {
@@ -122,11 +137,13 @@
             gap: 0.5rem;
         }
 
+        .card-header svg { flex-shrink: 0; }
+
         /* Video Feed Panel */
         .viewport-wrapper {
             position: relative;
             width: 100%;
-            aspect-ratio: 16 / 9;
+            aspect-ratio: 16 / 9; /* fallback until video metadata loads */
             background-color: #030712;
             border-radius: 8px;
             overflow: hidden;
@@ -140,6 +157,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            background: #000;
         }
 
         canvas {
@@ -149,6 +167,7 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+            display: block;
         }
 
         /* Sidebar Controls */
@@ -156,6 +175,7 @@
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
+            min-width: 0;
         }
 
         .form-group {
@@ -177,9 +197,11 @@
             color: var(--text-main);
             padding: 0.75rem 1rem;
             border-radius: 6px;
-            font-size: 0.95rem;
+            font-size: 1rem; /* >= 16px prevents iOS zoom on focus */
             outline: none;
             transition: border-color 0.2s ease;
+            width: 100%;
+            min-height: 44px;
         }
 
         input[type="text"]:focus {
@@ -193,6 +215,7 @@
             padding: 0.85rem 1.25rem;
             font-size: 0.95rem;
             font-weight: 600;
+            font-family: inherit;
             border-radius: 6px;
             cursor: pointer;
             transition: opacity 0.2s ease;
@@ -200,11 +223,13 @@
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
+            width: 100%;
+            min-height: 48px;
+            touch-action: manipulation;
         }
 
-        .btn-primary:hover {
-            opacity: 0.9;
-        }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:active { opacity: 0.8; }
 
         /* Status Toast */
         .status-box {
@@ -238,12 +263,14 @@
             gap: 0.5rem;
             max-height: 220px;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .log-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 0.75rem;
             padding: 0.6rem 0.85rem;
             background-color: var(--bg-base);
             border-radius: 6px;
@@ -253,19 +280,55 @@
 
         .identity-badge {
             font-weight: 600;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-
-        .identity-badge.known {
-            color: var(--accent-green);
-        }
-
-        .identity-badge.unknown {
-            color: var(--accent-red);
-        }
+        .identity-badge.known { color: var(--accent-green); }
+        .identity-badge.unknown { color: var(--accent-red); }
 
         .confidence-val {
             color: var(--text-muted);
             font-family: monospace;
+            flex-shrink: 0;
+        }
+
+        /* ---- Responsive breakpoints ---- */
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+                padding: 1.5rem;
+                gap: 1.5rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            header {
+                padding: 0.85rem 1.25rem;
+                padding-left: max(1.25rem, env(safe-area-inset-left));
+                padding-right: max(1.25rem, env(safe-area-inset-right));
+            }
+            main { padding: 1.25rem; }
+            .card { padding: 1.25rem; }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 0.75rem 1rem;
+                padding-left: max(1rem, env(safe-area-inset-left));
+                padding-right: max(1rem, env(safe-area-inset-right));
+            }
+            .logo-group { font-size: 1rem; gap: 0.5rem; }
+            .logo-icon { width: 20px; height: 20px; }
+            .system-badge { font-size: 0.72rem; padding: 0.3rem 0.6rem; }
+            main { padding: 1rem; gap: 1rem; }
+            .card { padding: 1rem; border-radius: 10px; }
+            .card-header { font-size: 0.8rem; margin-bottom: 1rem; }
+            .btn-primary { font-size: 0.95rem; }
+            .status-box { font-size: 0.82rem; padding: 0.75rem 0.85rem; }
+            .log-list { max-height: 180px; }
+            .log-item { font-size: 0.8rem; padding: 0.5rem 0.7rem; }
         }
     </style>
 </head>
@@ -287,7 +350,6 @@
     </header>
 
     <main>
-        <!-- Left Section: Camera Feed -->
         <section class="card">
             <div class="card-header">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -296,13 +358,12 @@
                 </svg>
                 Live Optical Feed
             </div>
-            <div class="viewport-wrapper">
-                <video id="video" autoplay playsinline></video>
+            <div class="viewport-wrapper" id="viewportWrapper">
+                <video id="video" autoplay playsinline muted></video>
                 <canvas id="overlay"></canvas>
             </div>
         </section>
 
-        <!-- Right Section: Controls & Telemetry -->
         <aside class="sidebar">
             <div class="card">
                 <div class="card-header">
@@ -317,7 +378,7 @@
                     <label for="nameInput">Full Name / Subject ID</label>
                     <input type="text" id="nameInput" placeholder="e.g. Alex Mercer" autocomplete="off">
                 </div>
-                <button class="btn-primary" onclick="registerFace()">
+                <button class="btn-primary" type="button" onclick="registerFace()">
                     Enroll Identity Profile
                 </button>
                 <div id="status" class="status-box" style="margin-top: 1rem;">
@@ -349,18 +410,30 @@
         const statusDiv = document.getElementById('status');
         const nameInput = document.getElementById('nameInput');
         const detectionLog = document.getElementById('detectionLog');
+        const viewportWrapper = document.getElementById('viewportWrapper');
 
         let isRecognizing = false;
 
-        // Initialize Webcam Stream
         async function setupCamera() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setStatus("Camera API unavailable. Serve over HTTPS or localhost.", "error");
+                return;
+            }
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'user' } },
+                    audio: false
+                });
                 video.srcObject = stream;
-                
+
                 video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    // Match the wrapper's aspect ratio to the actual video stream
+                    // so the overlay canvas maps 1:1 to the visible feed on any device.
+                    if (video.videoWidth && video.videoHeight) {
+                        viewportWrapper.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+                    }
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
                     setStatus("Optical sensor linked. Ready for scan.", "neutral");
                     setInterval(processFrame, 400);
                 };
@@ -385,7 +458,6 @@
         async function processFrame() {
             if (isRecognizing || video.paused || video.ended) return;
             isRecognizing = true;
-
             const imageData = captureImage();
 
             try {
@@ -394,7 +466,6 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: imageData })
                 });
-
                 const data = await response.json();
                 if (data.faces) {
                     drawResults(data.faces);
@@ -410,17 +481,21 @@
         function drawResults(faces) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // Ratio of internal pixels per CSS pixel — keeps strokes / fonts legible
+            // when the canvas is displayed smaller than its natural resolution (mobile).
+            const rect = canvas.getBoundingClientRect();
+            const ui = rect.width > 0 ? canvas.width / rect.width : 1;
+
             faces.forEach(face => {
                 const [x, y, w, h] = face.box;
                 const isKnown = face.name !== "Unknown";
                 const strokeColor = isKnown ? '#22c55e' : '#ef4444';
 
-                // High-Tech Corner Bounding Reticle
                 ctx.strokeStyle = strokeColor;
-                ctx.lineWidth = 2;
-                
+                ctx.lineWidth = Math.max(2, Math.round(2 * ui));
+
                 const cornerLen = Math.min(w, h) * 0.2;
-                
+
                 // Top-Left
                 ctx.beginPath();
                 ctx.moveTo(x, y + cornerLen);
@@ -449,17 +524,24 @@
                 ctx.lineTo(x + w, y + h - cornerLen);
                 ctx.stroke();
 
-                // Fill label background tag
-                ctx.fillStyle = strokeColor;
-                const label = isKnown ? `${face.name} [${(face.confidence * 100).toFixed(0)}%]` : "UNIDENTIFIED";
-                ctx.font = "600 13px Inter, sans-serif";
+                // Label background + text (scaled so it reads at ~13 CSS px on any screen)
+                const label = isKnown
+                    ? `${face.name} [${(face.confidence * 100).toFixed(0)}%]`
+                    : "UNIDENTIFIED";
+                const fontPx = Math.max(13, Math.round(13 * ui));
+                const padX = Math.round(7 * ui);
+                const boxH = Math.round(26 * ui);
+
+                ctx.font = `600 ${fontPx}px Inter, sans-serif`;
                 const textWidth = ctx.measureText(label).width;
 
-                ctx.fillRect(x, y - 26, textWidth + 14, 26);
+                ctx.fillStyle = strokeColor;
+                ctx.fillRect(x, y - boxH, textWidth + padX * 2, boxH);
 
-                // Label Text
                 ctx.fillStyle = '#000000';
-                ctx.fillText(label, x + 7, y - 8);
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, x + padX, y - boxH / 2);
+                ctx.textBaseline = 'alphabetic';
             });
         }
 
@@ -502,9 +584,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: name, image: imageData })
                 });
-
                 const data = await response.json();
-
                 if (response.ok) {
                     setStatus(data.message, "success");
                     nameInput.value = "";
